@@ -1,0 +1,108 @@
+---
+title: "Project and Data Setup"
+output: html_notebook
+---
+
+# Project Setup
+
+## Lichess Database
+
+## R
+
+### Installing Tools
+
+### Installing Packages
+
+
+# Data Setup
+
+## Batch Process Files
+
+```{r, eval=FALSE, message=FALSE, results='hide'}
+
+
+library(tidyverse)
+library(stringr)
+
+lines_to_read <- 10000
+
+lines_to_skip <- 0
+
+first_run <- TRUE
+
+lines_read <- lines_to_read
+
+#while (lines_read == lines_to_read)
+for (i in 1:3)
+{
+  batch_read <-
+    read_delim(
+      paste0(
+        database_filepath,
+        "lichess_db_standard_rated_2017-04.pgn"
+      ),
+      delim = "\n",
+      quote = "",
+      escape_double = FALSE,
+      col_names = FALSE,
+      skip = lines_to_skip,
+      n_max = lines_to_read
+    ) %>%
+    mutate(
+      game_id = cumsum(!str_detect(X1, "^\\[")),
+      game_id = lag(game_id),
+      game_id = if_else(is.na(game_id), 1, game_id + 1)
+    )
+  
+  lines_read <- nrow(batch_read)
+  
+  if (str_detect(batch_read[lines_to_read, 1], "^\\["))
+  {
+    batch_read <- batch_read %>%
+      filter(game_id < max(game_id))
+  }
+  
+  lines_to_skip <- lines_to_skip + nrow(batch_read)
+  
+  batch_read <- batch_read %>%
+    mutate(
+      key = if_else(
+        str_detect(X1, "^\\["),
+        str_replace(X1, "\\[(\\w+).+", "\\1"),
+        "Moves"
+      ),
+      value = if_else(
+        str_detect(X1, "^\\["),
+        str_replace(X1, "\\[\\w+ \\\"(.+)\\\"\\]", "\\1"),
+        X1
+      )
+    ) %>%
+    select(-X1) %>%
+    spread(key, value) %>%
+    select(-game_id) %>%
+    filter(str_detect(Moves, "eval"))
+  
+  if (first_run)
+  {
+    eval_games_df <- batch_read
+    
+    first_run <- FALSE
+  }
+  else
+  {
+    eval_games_df <- bind_rows(eval_games_df, batch_read)
+  }
+}
+```
+
+
+## Structure Moves Into Data Frame
+
+
+
+
+
+
+
+
+

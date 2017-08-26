@@ -3,11 +3,6 @@ title: "Project and Data Setup"
 output: html_notebook
 ---
 
-# Overview
-
-## Thanks
-
-
 # Project Setup
 
 ## Lichess Database
@@ -25,46 +20,160 @@ output: html_notebook
 
 ### Batch Process Files
 
-### Structure Moves Into Data Frame
 
-### Format and Order Columns
+
+### Join Batched Files Together
 
 
 
 
 ## Code
 
-```{r, eval=FALSE, message=FALSE, warning=FALSE, results='hide'}
+### data.table batch read and formatting
+
+```{r data.table version, eval=FALSE, message=FALSE, warning=FALSE, results='hide'}
+
+library(data.table)
+
+
+lines_to_read <- 10000000
+
+
+lichess_db_standard_rated_filename <-
+  "lichess_db_standard_rated_2017-04.pgn"
+month <- "april"
+month_piece <- 1
+
+lines_to_skip <- 0
+
+lines_read <- lines_to_read
+
+while (lines_read == lines_to_read)
+# for (i in 1:3)
+{
+  batch_read <- fread(paste0(
+        lichess_db_standard_rated_filepath,
+        lichess_db_standard_rated_filename
+      ),
+      sep = "`",
+      nrows = lines_to_read,
+      header = FALSE,
+      skip = lines_to_skip,
+      quote = "",
+      blank.lines.skip = TRUE)
+  
+  lines_read <- nrow(batch_read)
+  
+  batch_read[,game_id := cumsum(grepl("^\\[Event", V1))]
+  
+  if (grepl("^\\[", batch_read[.N, 1]))
+  {
+    batch_read <- batch_read[game_id < max(game_id)]
+  }
+  
+  lines_to_skip <- lines_to_skip + nrow(batch_read)
+  
+  batch_read <- batch_read[game_id %in% batch_read[!grepl("^\\[", V1) & grepl("eval", V1), game_id]]
+  
+  batch_read[,tag := ifelse(grepl("^\\[", V1), sub("\\[(\\w+).+", "\\1", V1), "Movetext")][,value := ifelse(grepl("^\\[", V1), sub("\\[\\w+ \\\"(.+)\\\"\\]", "\\1", V1), V1)][,V1 := NULL]
+  
+  batch_read <- dcast(batch_read, game_id ~ tag, value.var = "value")
+  
+  batch_read[,game_id := NULL]
+  
+  setcolorder(batch_read,
+              c("Event",
+      "Site",
+      "White",
+      "Black",
+      "Result",
+      "UTCDate",
+      "UTCTime",
+      "WhiteElo",
+      "BlackElo",
+      "WhiteRatingDiff",
+      "BlackRatingDiff",
+      "WhiteTitle",
+      "BlackTitle",
+      "ECO",
+      "Opening",
+      "TimeControl",
+      "Termination",
+      "Movetext"))
+  
+  
+  month_piece_filename <- paste0(month, "_", month_piece)
+  assign(month_piece_filename, batch_read)
+  save(
+    list = month_piece_filename,
+    file = paste0(
+      lichess_db_standard_rated_eval_stage_filepath,
+      month_piece_filename,
+      ".rda"
+    )
+  )
+  rm(list = month_piece_filename)
+  
+  
+  month_piece <- month_piece + 1
+}
+
+```
+
+### join batched files together
+
+```{r joining batches together, eval=FALSE}
+
+library(dplyr)
+
+
+month <- "april"
+max_file_pieces <- 21
+
+
+for (month_piece in 1:max_file_pieces)
+{
+  month_piece_filename <- paste0(month, "_", month_piece)
+  load(
+    file = paste0(
+      lichess_db_standard_rated_eval_stage_filepath,
+      month_piece_filename,
+      ".rda"
+    )
+  )
+  
+  if (month_piece == 1)
+  {
+    april_eval_base <- get(month_piece_filename)
+  }
+  else
+  {
+    april_eval_base <-
+      bind_rows(april_eval_base, get(month_piece_filename))
+  }
+  
+  rm(list = month_piece_filename)
+}
+
+save(
+  april_eval_base,
+  file = paste0(lichess_db_standard_rated_filepath,
+                "april_eval_base.rda")
+)
+
+```
+
+
+
+### dplyr batch read and processing for reference
+
+```{r dplyr version, eval=FALSE, message=FALSE, warning=FALSE, results='hide'}
 
 library(tidyverse)
 library(stringr)
 
 
 lines_to_read <- 100000
-
-
-format_moves <- function(movetext)
-{
-  movetext_df <-
-    str_match_all(
-      movetext,
-      "(\\d+)([.]+) ([a-h1-8KQRBNxO=#+-]+)([?!]*) \\{( \\[%eval ([0-9.#-]+)\\])? \\[%clk ([0-9:]+)\\] \\}"
-    )
-  
-  movetext_df <- as.data.frame(movetext_df[[1]][, c(-1, -6)])
-  
-  colnames(movetext_df) <-
-    c(
-      "MoveNumber",
-      "Indicator",
-      "AlgebraicNotation",
-      "Annotation",
-      "Evaluation",
-      "Clock"
-    )
-  
-  movetext_df
-}
 
 
 lichess_db_standard_rated_filename <-
@@ -123,7 +232,6 @@ for (i in 1:3)
     spread(key, value) %>%
     select(-game_id) %>%
     filter(str_detect(Moves, "eval")) %>%
-    mutate(Moves = map(Moves, format_moves)) %>%
     select(
       Event,
       Site,

@@ -1,0 +1,317 @@
+---
+title: "Data Formatting and Manipulations"
+output: html_notebook
+---
+
+https://en.wikipedia.org/wiki/Portable_Game_Notation
+
+```{r setup}
+
+library(data.table)
+library(tidyverse)
+
+drop_columns_after_manipulation <- FALSE
+check_factors_lost_data <- TRUE
+
+```
+
+```{r load data}
+
+# load(file = paste0(lichess_db_standard_rated_filepath,
+#                    "april_eval_base.rda"))
+# 
+# april_eval_base <- april_eval_base[!is.na(Event)]
+
+
+load(file = paste0(lichess_db_standard_rated_eval_stage_filepath,
+                   "april_1.rda"))
+april_eval_base <- april_1
+
+```
+
+```{r event}
+april_eval_base[, TimeControlVariation := factor(
+  sub("^\\w+ (\\w+).+", "\\1", Event),
+  levels = c(
+  "UltraBullet",
+  "Bullet",
+  "Blitz",
+  "Classical",
+  "Correspondence"
+  )
+  )][, TournamentSite := ifelse(grepl("game", Event),
+  NA,
+  sub("^\\w+ \\w+ \\w+ (.*)", "\\1", Event))]
+  
+  
+if (check_factors_lost_data)
+{
+  event_original <- as.data.table(april_eval_base$Event)
+  
+  if (nrow(event_original[!grepl("^Rated", V1)]) > 0)
+  {
+    stop("First word other than 'Rated' found!")
+  }
+  
+  event_original[, TimeControlVariation := sub("^\\w+ (\\w+).+", "\\1", V1)]
+  if (nrow(count(april_eval_base[!is.na(TimeControlVariation)], TimeControlVariation)) != nrow(count(event_original, TimeControlVariation)))
+  {
+    stop("Additional TimeControlVariation found!")
+  }
+  
+  event_original[, GameTournamentFactor := factor(sub("^\\w+ \\w+ (\\w+).*", "\\1", V1),
+  levels = c("game", "tournament"))][, GameTournament := sub("^\\w+ \\w+ (\\w+).*", "\\1", V1)]
+  if (nrow(count(event_original[!is.na(GameTournamentFactor)], GameTournamentFactor)) != nrow(count(event_original, GameTournament)))
+  {
+    stop("Third word other than 'game' or 'tournament' found!")
+  }
+  
+  rm(event_original)
+}
+  
+if (drop_columns_after_manipulation)
+{
+  april_eval_base[, Event := NULL]
+}
+```
+
+```{r result}
+april_eval_base[, Winner := factor(ifelse(grepl("[*]", Result), "Abandoned", ifelse(grepl("2", Result), "Draw", ifelse(grepl("^1", Result), "White", "Black"))), levels = c("White", "Black", "Draw", "Abandoned"))]
+
+if(check_factors_lost_data)
+{
+  if(nrow(count(april_eval_base[!is.na(Winner)], Winner)) != nrow(count(april_eval_base, Result)))
+  {
+    stop("Additional Result found!")
+  }
+}
+
+if(drop_columns_after_manipulation)
+{
+  april_eval_base[, Result := NULL]
+}
+```
+
+https://en.wikipedia.org/wiki/Chess_rating_system#Elo_rating_system
+```{r elo}
+april_eval_base$WhiteElo <- as.numeric(april_eval_base$WhiteElo)
+april_eval_base$BlackElo <- as.numeric(april_eval_base$BlackElo)
+
+elo_levels <- c(
+  "Below 1200",
+  "1200 - 1399",
+  "1400 - 1599",
+  "1600 - 1799",
+  "1800 - 1999",
+  "2000 - 2199",
+  "2200 - 2299",
+  "2300 - 2399",
+  "2400 - 2499",
+  "2500 - 2699",
+  "2700+"
+  )
+april_eval_base[, WhiteEloRange := factor(
+  ifelse(
+  WhiteElo < 1200,
+  "Below 1200",
+  ifelse(
+  WhiteElo < 1400,
+  "1200 - 1399",
+  ifelse(
+  WhiteElo < 1600,
+  "1400 - 1599",
+  ifelse(
+  WhiteElo < 1800,
+  "1600 - 1799",
+  ifelse(
+  WhiteElo < 2000,
+  "1800 - 1999",
+  ifelse(
+  WhiteElo < 2200,
+  "2000 - 2199",
+  ifelse(
+  WhiteElo < 2300,
+  "2200 - 2299",
+  ifelse(
+  WhiteElo < 2400,
+  "2300 - 2399",
+  ifelse(
+  WhiteElo < 2500,
+  "2400 - 2499",
+  ifelse(WhiteElo < 2700,
+  "2500 - 2699",
+  "2700+")
+  )
+  )
+  )
+  )
+  )
+  )
+  )
+  )
+  ),
+  levels = elo_levels
+  )][, BlackEloRange := factor(
+  ifelse(
+  BlackElo < 1200,
+  "Below 1200",
+  ifelse(
+  BlackElo < 1400,
+  "1200 - 1399",
+  ifelse(
+  BlackElo < 1600,
+  "1400 - 1599",
+  ifelse(
+  BlackElo < 1800,
+  "1600 - 1799",
+  ifelse(
+  BlackElo < 2000,
+  "1800 - 1999",
+  ifelse(
+  BlackElo < 2200,
+  "2000 - 2199",
+  ifelse(
+  BlackElo < 2300,
+  "2200 - 2299",
+  ifelse(
+  BlackElo < 2400,
+  "2300 - 2399",
+  ifelse(
+  BlackElo < 2500,
+  "2400 - 2499",
+  ifelse(BlackElo < 2700,
+  "2500 - 2699",
+  "2700+")
+  )
+  )
+  )
+  )
+  )
+  )
+  )
+  )
+  ),
+  levels = elo_levels
+  )]
+rm(elo_levels)
+```
+
+```{r ratingdiff}
+april_eval_base$WhiteRatingDiff <- as.numeric(april_eval_base$WhiteRatingDiff)
+april_eval_base$BlackRatingDiff <- as.numeric(april_eval_base$BlackRatingDiff)
+```
+
+https://lichess.org/help/master
+```{r title}
+if(check_factors_lost_data)
+{
+  whitetitle_original <- as.data.table(april_eval_base$WhiteTitle)
+  blacktitle_original <- as.data.table(april_eval_base$BlackTitle)
+}
+
+title_levels <-
+  c(NA,
+    "LM",
+    "WNM",
+    "NM",
+    "WCM",
+    "CM",
+    "WFM",
+    "FM",
+    "WIM",
+    "IM",
+    "WGM",
+    "GM")
+april_eval_base$WhiteTitle <- factor(april_eval_base$WhiteTitle,
+                                     levels = title_levels)
+april_eval_base$BlackTitle <- factor(april_eval_base$BlackTitle,
+                                     levels = title_levels)
+rm(title_levels)
+
+if(check_factors_lost_data)
+{
+  if(nrow(count(april_eval_base[!is.na(WhiteTitle)], WhiteTitle)) != nrow(count(whitetitle_original[!is.na(V1)], V1)))
+  {
+    stop("Additional WhiteTitle found!")
+  }
+  if(nrow(count(april_eval_base[!is.na(BlackTitle)], BlackTitle)) != nrow(count(blacktitle_original[!is.na(V1)], V1)))
+  {
+    stop("Additional BlackTitle found!")
+  }
+  
+  rm(whitetitle_original)
+  rm(blacktitle_original)
+}
+```
+
+```{r ECO}
+
+```
+
+```{r time control}
+april_eval_base[, TimeControlMinutes := ifelse(grepl("[-]", TimeControl), NA, as.numeric(sub("(\\d+).+", "\\1", TimeControl)) / 60)][, TimeControlIncrement := ifelse(grepl("[-]", TimeControl), NA, as.numeric(sub("\\d+[+](\\d+)", "\\1", TimeControl)))]
+
+if(drop_columns_after_manipulation)
+{
+  april_eval_base[, TimeControl := NULL]
+}
+```
+
+```{r termination}
+if(check_factors_lost_data)
+{
+  termination_original <- as.data.table(april_eval_base$Termination)
+}
+
+april_eval_base$Termination <- factor(april_eval_base$Termination, levels = c("Normal", "Time forfeit", "Abandoned", "Rules infraction"))
+
+if(check_factors_lost_data)
+{
+  if(nrow(count(april_eval_base[!is.na(Termination)], Termination)) != nrow(count(termination_original, V1)))
+  {
+    stop("Additional Termination found!")
+  }
+  
+  rm(termination_original)
+}
+```
+
+```{r checkmate flag}
+april_eval_base[, Checkmate := grepl("# ", Movetext)]
+```
+
+
+```{r movetext}
+
+library(dplyr)
+library(purrr)
+library(stringr)
+
+format_moves <- function(movetext)
+{
+  movetext_df <-
+    str_match_all(
+      movetext,
+      "(\\d+)([.]+) ([a-h1-8KQRBNxO=#+-]+)([?!]*) \\{( \\[%eval ([0-9.#-]+)\\])? \\[%clk ([0-9:]+)\\] \\}"
+    )
+  
+  movetext_df <- as.data.frame(movetext_df[[1]][, c(-1, -6)])
+  
+  colnames(movetext_df) <-
+    c(
+      "MoveNumber",
+      "Indicator",
+      "AlgebraicNotation",
+      "Annotation",
+      "Evaluation",
+      "Clock"
+    )
+  
+  movetext_df
+}
+
+batch_read <- batch_read %>%
+    mutate(Moves = map(Moves, format_moves))
+
+```
+

@@ -3,86 +3,117 @@ title: "Project and Data Setup"
 output: html_notebook
 ---
 
-# Project Setup
+***
 
-## Lichess Database
+## Project Setup
+This project requires both the chess data and R:
 
-## R
+### Lichess Database
+The files containing the PGNs of all games ever played on Lichess is located at:
 
-### Installing Tools
+* <https://database.lichess.org/>
 
-### Installing Packages
+For this project, we are going to focus on the games with both **clock states** (for games other than Correspondence games) and **Stockfish analysis evaluations**.  This narrows us down to the files for **April -- July 2017**.  We will further filter the data as we read the files in R to just games which contain the Stockfish analysis evaluations.
 
+### R
+In order to set up our analysis environment, we'll need both R and the necessary packages:
 
-# Data Setup
+#### Installing R
+First, we'll need to download and install the R language and the RStudio IDE:
 
-## Code Overview
+* R language: <https://cran.r-project.org/>
+* RStudio IDE: <https://www.rstudio.com/>
 
-### Batch Process Files
+The R language is a programming language for statistical computing -- it is the engine which will power this project.  RStudio is an integrated development environment (IDE) for R -- it not only helps us write our code by identifying errors, it also helps manage our packages.
 
+#### Installing Packages
+Once everything is installed, we will need the R packages which contain the functions for reading, manipulating, analyzing, and visualizing the data.  In the RStudio console, run:
 
+* `install.packages(c("data.table", "tidyverse"))`
 
-### Join Batched Files Together
+`data.table` contains functions which allows for quick reads and manipulations of large data sets.  The `tidyverse` contains functions for data reads and manipulations along with visualizations.
 
+***
 
+## Data Setup
+After unzipping, each month's file is ~24GB of ~203 million lines of text.  This is too large and impractical to load into R at one time, so we must process the file in batches and then join those batches together:
 
-
-## Code
-
-### data.table batch read and formatting
+### `data.table` Batch Read and Processing
 
 ```{r data.table version, eval=FALSE, message=FALSE, warning=FALSE, results='hide'}
 
+#load the data.table package
 library(data.table)
 
-
+#set the batch size (adjust as necessary)
 lines_to_read <- 10000000
 
-
+#set the month to process
 lichess_db_standard_rated_filename <-
   "lichess_db_standard_rated_2017-04.pgn"
 month <- "april"
+
+#set required variables
 month_piece <- 1
-
 lines_to_skip <- 0
-
 lines_read <- lines_to_read
 
+#once less than the set number of lines to read is returned, we know that we're at the end of the file
 while (lines_read == lines_to_read)
-# for (i in 1:3)
 {
-  batch_read <- fread(paste0(
-        lichess_db_standard_rated_filepath,
-        lichess_db_standard_rated_filename
-      ),
-      sep = "`",
-      nrows = lines_to_read,
-      header = FALSE,
-      skip = lines_to_skip,
-      quote = "",
-      blank.lines.skip = TRUE)
+  #fread is fast read from data.table
+  #
+  #fread assumes that it is reading a csv, but the lichess file is 1 column of text, so, the separation character is set to something we don't expect to see in the file (the backtick)
+  batch_read <- fread(
+    paste0(
+      lichess_db_standard_rated_filepath,
+      lichess_db_standard_rated_filename
+    ),
+    sep = "`",
+    nrows = lines_to_read,
+    header = FALSE,
+    skip = lines_to_skip,
+    quote = "",
+    blank.lines.skip = TRUE
+  )
   
+  #capture how many rows were returned
   lines_read <- nrow(batch_read)
   
-  batch_read[,game_id := cumsum(grepl("^\\[Event", V1))]
+  #each game is an unknown number of lines of text (usually between 16 and 18), therefore we need a way of grouping lines together to identify a single game.  as each game starts with the Event tag, grepl looks for this tag and sets this row to TRUE which R interprets as 1; all other rows are set to FALSE or 0.  cumsum performs a cumulative sum down these identifiers which sets each row for a single game to the same number and increments the number for each game (e.g. n + 0 = n for each non-Event row; n + 1 = (n + 1) for each Event row)
+  batch_read[, game_id := cumsum(grepl("^\\[Event", V1))]
   
+  #if the last row read starts with a bracket, it's not movetext and therefore we know that we do not have all of the lines of the last game read.  we want to remove this partial game from this batch read so that when we cast the data into a table with multiple columns we don't have partially filled rows.  this also ensures that each batch starts at the beginning of a game's sequence of rows
   if (grepl("^\\[", batch_read[.N, 1]))
   {
     batch_read <- batch_read[game_id < max(game_id)]
   }
   
+  #capture how many lines from this batch were used
   lines_to_skip <- lines_to_skip + nrow(batch_read)
   
-  batch_read <- batch_read[game_id %in% batch_read[!grepl("^\\[", V1) & grepl("eval", V1), game_id]]
+  #only keep games whose movetext includes the computer evaluations
+  batch_read <-
+    batch_read[game_id %in% batch_read[!grepl("^\\[", V1) &
+                                         grepl("eval", V1), game_id]]
   
-  batch_read[,tag := ifelse(grepl("^\\[", V1), sub("\\[(\\w+).+", "\\1", V1), "Movetext")][,value := ifelse(grepl("^\\[", V1), sub("\\[\\w+ \\\"(.+)\\\"\\]", "\\1", V1), V1)][,V1 := NULL]
+  #split the single column into columns with the tag name and tag value then drop the original single column
+  batch_read[, tag := ifelse(grepl("^\\[", V1), sub("\\[(\\w+).+", "\\1", V1), "Movetext")][, value := ifelse(grepl("^\\[", V1),
+                                                                                                              sub("\\[\\w+ \\\"(.+)\\\"\\]", "\\1", V1),
+                                                                                                              V1)][, V1 := NULL]
   
-  batch_read <- dcast(batch_read, game_id ~ tag, value.var = "value")
+  #cast the data into an 18 column table containing a column for each tag with each row being a single game
+  batch_read <-
+    dcast(batch_read, game_id ~ tag, value.var = "value")
   
-  batch_read[,game_id := NULL]
+  #drop the game_id created earlier as the site URL already contains a unique id for each game
+  batch_read[, game_id := NULL]
   
-  setcolorder(batch_read,
-              c("Event",
+  #reorder the columns to match the original PGN order
+  setcolorder(
+    batch_read,
+    c(
+      "Event",
       "Site",
       "White",
       "Black",
@@ -99,9 +130,11 @@ while (lines_read == lines_to_read)
       "Opening",
       "TimeControl",
       "Termination",
-      "Movetext"))
+      "Movetext"
+    )
+  )
   
-  
+  #rename this batch with a unique name and save it
   month_piece_filename <- paste0(month, "_", month_piece)
   assign(month_piece_filename, batch_read)
   save(
@@ -112,27 +145,29 @@ while (lines_read == lines_to_read)
       ".rda"
     )
   )
+  
+  #remove this batch from the environment to manage memory
   rm(list = month_piece_filename)
   
-  
+  #update for the next batch
   month_piece <- month_piece + 1
 }
-
 ```
 
-### join batched files together
+### Joining the Batched Files Together
 
 ```{r joining batches together, eval=FALSE}
 
+#load the dplyr package
 library(dplyr)
 
-
+#set the month of batch files to join and how many pieces
 month <- "april"
 max_file_pieces <- 21
 
-
 for (month_piece in 1:max_file_pieces)
 {
+  #load the batch piece
   month_piece_filename <- paste0(month, "_", month_piece)
   load(
     file = paste0(
@@ -142,6 +177,7 @@ for (month_piece in 1:max_file_pieces)
     )
   )
   
+  #if this is the first piece, set it to the final file, otherwise append this piece of the bottom of the final file
   if (month_piece == 1)
   {
     april_eval_base <- get(month_piece_filename)
@@ -152,42 +188,46 @@ for (month_piece in 1:max_file_pieces)
       bind_rows(april_eval_base, get(month_piece_filename))
   }
   
+  #remove this piece from the environment to manage memory
   rm(list = month_piece_filename)
 }
 
+#save the final file
 save(
   april_eval_base,
   file = paste0(lichess_db_standard_rated_filepath,
                 "april_eval_base.rda")
 )
-
 ```
 
-
-
-### dplyr batch read and processing for reference
+### `dplyr` Batch Read and Processing *(For Reference)*
+While code written in dplyr is easier to read, it is unfortunately not equipped to handle data of this size.  Rather than simply discarding this code, it is included for reference:
 
 ```{r dplyr version, eval=FALSE, message=FALSE, warning=FALSE, results='hide'}
 
+#load the necessary packages
 library(tidyverse)
 library(stringr)
 
-
+#set the batch size (adjust as necessary)
 lines_to_read <- 100000
 
-
+#set the month to process
 lichess_db_standard_rated_filename <-
   "lichess_db_standard_rated_2017-04.pgn"
 month <- "april"
+
+#set required variables
 month_piece <- 1
-
 lines_to_skip <- 0
-
 lines_read <- lines_to_read
 
-# while (lines_read == lines_to_read)
-for (i in 1:3)
+#once less than the set number of lines to read is returned, we know that we're at the end of the file
+while (lines_read == lines_to_read)
 {
+  #read_delim needs a separation character, but the lichess file is 1 column of text, so, set it to newline
+  #
+  #each game is an unknown number of lines of text (usually between 16 and 18), therefore we need a way of grouping lines together to identify a single game.  as each game starts with the Event tag, grepl looks for this tag and sets this row to TRUE which R interprets as 1; all other rows are set to FALSE or 0.  cumsum performs a cumulative sum down these identifiers which sets each row for a single game to the same number and increments the number for each game (e.g. n + 0 = n for each non-Event row; n + 1 = (n + 1) for each Event row)
   batch_read <-
     read_delim(
       paste0(
@@ -205,16 +245,30 @@ for (i in 1:3)
       game_id = cumsum(str_detect(X1, "^\\[Event"))
     )
   
+  #capture how many rows were returned
   lines_read <- nrow(batch_read)
   
+  #if the last row read starts with a bracket, it's not movetext and therefore we know that we do not have all of the lines of the last game read.  we want to remove this partial game from this batch read so that when we cast the data into a table with multiple columns we don't have partially filled rows.  this also ensures that each batch starts at the beginning of a game's sequence of rows
   if (str_detect(batch_read[lines_to_read, 1], "^\\["))
   {
     batch_read <- batch_read %>%
       filter(game_id < max(game_id))
   }
   
+  #capture how many lines from this batch were used
   lines_to_skip <- lines_to_skip + nrow(batch_read)
   
+  #split the single column into columns with the tag name and tag value
+  #
+  #drop the original single column
+  #
+  #spread the data into an 18 column table containing a column for each tag with each row being a single game
+  #
+  #drop the game_id created earlier as the site URL already contains a unique id for each game
+  #
+  #only keep games whose movetext includes the computer evaluations
+  #
+  #reorder the columns to match the original PGN order
   batch_read <- batch_read %>%
     mutate(
       key = if_else(
@@ -253,22 +307,27 @@ for (i in 1:3)
       Moves
     )
   
+  #rename this batch with a unique name and save it
   month_piece_filename <- paste0(month, "_", month_piece)
   assign(month_piece_filename, batch_read)
-  # save(
-  #   list = month_piece_filename,
-  #   file = paste0(
-  #     lichess_db_standard_rated_eval_stage_filepath,
-  #     month_piece_filename,
-  #     ".rda"
-  #   )
-  # )
-  # rm(list = month_piece_filename)
+  save(
+    list = month_piece_filename,
+    file = paste0(
+      lichess_db_standard_rated_eval_stage_filepath,
+      month_piece_filename,
+      ".rda"
+    )
+  )
   
+  #remove this batch from the environment to manage memory
+  rm(list = month_piece_filename)
+  
+  #update for the next batch
   month_piece <- month_piece + 1
 }
-
 ```
+
+
 
 
 

@@ -3,33 +3,50 @@ title: "Data Formatting and Manipulations"
 output: html_notebook
 ---
 
-https://en.wikipedia.org/wiki/Portable_Game_Notation
+***
 
-```{r setup}
+## Overview
 
+Reading in the data as batches in [Project and Data Setup](http://htmlpreview.github.io/?https://github.com/chris-w-r/lichess-database-exploration/blob/master/Project%20and%20Data%20Setup.nb.html) saves all of the values in the columns as `strings`.  While it may be helpful for the future to retain copies of the data in their raw formats as received from [Lichess](https://lichess.org/), we want to format and manipulate these values into variables types which R prefers -- `numerics` and `factors`.
+
+We will format and manipulate each column (or group of similar columns such as titles) leveraging [Wikipedia's PGN article](https://en.wikipedia.org/wiki/Portable_Game_Notation) as a general guide to expected values.  If a column requires a specific reference guide, it is included in its section.
+
+***
+
+## Code
+
+* [Setup and Load Data](#setup)
+* [Event](#event)
+* [Result](#result)
+* [Elo](#elo)
+* [RatingDiff](#ratingdiff)
+* [Title](#title)
+* [ECO](#ECO)
+* [Time Control](#timecontrol)
+* [Termination](#termination)
+* [Movetext](#movetext)
+
+### Setup and Load Data {#setup}
+```{r setup and load data, eval=FALSE}
 library(data.table)
 library(tidyverse)
 
 drop_columns_after_manipulation <- FALSE
 check_factors_lost_data <- TRUE
 
+
+load(file = paste0(lichess_db_standard_rated_filepath,
+                   "april_eval_base.rda"))
+april_eval_base <- april_eval_base[!is.na(Event)]
+
+
+# load(file = paste0(lichess_db_standard_rated_eval_stage_filepath,
+#                    "april_1.rda"))
+# april_eval_base <- april_1
 ```
 
-```{r load data}
-
-# load(file = paste0(lichess_db_standard_rated_filepath,
-#                    "april_eval_base.rda"))
-# 
-# april_eval_base <- april_eval_base[!is.na(Event)]
-
-
-load(file = paste0(lichess_db_standard_rated_eval_stage_filepath,
-                   "april_1.rda"))
-april_eval_base <- april_1
-
-```
-
-```{r event}
+### Event {#event}
+```{r event, eval=FALSE}
 april_eval_base[, TimeControlVariation := factor(
   sub("^\\w+ (\\w+).+", "\\1", Event),
   levels = c(
@@ -75,7 +92,8 @@ if (drop_columns_after_manipulation)
 }
 ```
 
-```{r result}
+### Result {#result}
+```{r result, eval=FALSE}
 april_eval_base[, Winner := factor(ifelse(grepl("[*]", Result), "Abandoned", ifelse(grepl("2", Result), "Draw", ifelse(grepl("^1", Result), "White", "Black"))), levels = c("White", "Black", "Draw", "Abandoned"))]
 
 if(check_factors_lost_data)
@@ -92,8 +110,9 @@ if(drop_columns_after_manipulation)
 }
 ```
 
-https://en.wikipedia.org/wiki/Chess_rating_system#Elo_rating_system
-```{r elo}
+### Elo {#elo}
+<https://en.wikipedia.org/wiki/Chess_rating_system#Elo_rating_system>
+```{r elo, eval=FALSE}
 april_eval_base$WhiteElo <- as.numeric(april_eval_base$WhiteElo)
 april_eval_base$BlackElo <- as.numeric(april_eval_base$BlackElo)
 
@@ -196,13 +215,15 @@ april_eval_base[, WhiteEloRange := factor(
 rm(elo_levels)
 ```
 
-```{r ratingdiff}
+### RatingDiff {#ratingdiff}
+```{r ratingdiff, eval=FALSE}
 april_eval_base$WhiteRatingDiff <- as.numeric(april_eval_base$WhiteRatingDiff)
 april_eval_base$BlackRatingDiff <- as.numeric(april_eval_base$BlackRatingDiff)
 ```
 
-https://lichess.org/help/master
-```{r title}
+### Title {#title}
+<https://lichess.org/help/master>
+```{r title, eval=FALSE}
 if(check_factors_lost_data)
 {
   whitetitle_original <- as.data.table(april_eval_base$WhiteTitle)
@@ -244,11 +265,13 @@ if(check_factors_lost_data)
 }
 ```
 
-```{r ECO}
-
+### ECO {#ECO}
+```{r ECO, eval=FALSE}
+#TBD
 ```
 
-```{r time control}
+### Time Control {#timecontrol}
+```{r time control, eval=FALSE}
 april_eval_base[, TimeControlMinutes := ifelse(grepl("[-]", TimeControl), NA, as.numeric(sub("(\\d+).+", "\\1", TimeControl)) / 60)][, TimeControlIncrement := ifelse(grepl("[-]", TimeControl), NA, as.numeric(sub("\\d+[+](\\d+)", "\\1", TimeControl)))]
 
 if(drop_columns_after_manipulation)
@@ -257,7 +280,8 @@ if(drop_columns_after_manipulation)
 }
 ```
 
-```{r termination}
+### Termination {#termination}
+```{r termination, eval=FALSE}
 if(check_factors_lost_data)
 {
   termination_original <- as.data.table(april_eval_base$Termination)
@@ -276,12 +300,13 @@ if(check_factors_lost_data)
 }
 ```
 
-```{r checkmate flag}
+### Movetext {#movetext}
+```{r checkmate flag, eval=FALSE}
 april_eval_base[, Checkmate := grepl("# ", Movetext)]
 ```
 
 
-```{r movetext}
+```{r movetext, eval=FALSE}
 
 library(dplyr)
 library(purrr)

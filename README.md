@@ -10,7 +10,7 @@ Lichess generously made available for free a [database](https://database.lichess
 
 ## Supporting Files
 
-* [Project and Data Setup](https://cdn.rawgit.com/chris-w-r/lichess-database-exploration/master/Project and Data Setup.nb.html)
+* [Project and Data Setup](https://cdn.rawgit.com/chris-w-r/lichess-database-exploration/master/Project%20and%20Data%20Setup.nb.html)
 * [Data Formatting and Manipulations](https://cdn.rawgit.com/chris-w-r/lichess-database-exploration/master/Data%20Formatting%20and%20Manipulations.nb.html) *(Work in Progress)*
 
 ## Thanks

@@ -116,7 +116,21 @@ if(drop_columns_after_manipulation)
 april_eval_base$WhiteElo <- as.numeric(april_eval_base$WhiteElo)
 april_eval_base$BlackElo <- as.numeric(april_eval_base$BlackElo)
 
-elo_levels <- c(
+elo_breaks <- c(
+  -Inf,
+  1200,
+  1400,
+  1600,
+  1800,
+  2000,
+  2200,
+  2300,
+  2400,
+  2500,
+  2700,
+  Inf
+)
+elo_labels <- c(
   "Below 1200",
   "1200 - 1399",
   "1400 - 1599",
@@ -129,90 +143,18 @@ elo_levels <- c(
   "2500 - 2699",
   "2700+"
   )
-april_eval_base[, WhiteEloRange := factor(
-  ifelse(
-  WhiteElo < 1200,
-  "Below 1200",
-  ifelse(
-  WhiteElo < 1400,
-  "1200 - 1399",
-  ifelse(
-  WhiteElo < 1600,
-  "1400 - 1599",
-  ifelse(
-  WhiteElo < 1800,
-  "1600 - 1799",
-  ifelse(
-  WhiteElo < 2000,
-  "1800 - 1999",
-  ifelse(
-  WhiteElo < 2200,
-  "2000 - 2199",
-  ifelse(
-  WhiteElo < 2300,
-  "2200 - 2299",
-  ifelse(
-  WhiteElo < 2400,
-  "2300 - 2399",
-  ifelse(
-  WhiteElo < 2500,
-  "2400 - 2499",
-  ifelse(WhiteElo < 2700,
-  "2500 - 2699",
-  "2700+")
-  )
-  )
-  )
-  )
-  )
-  )
-  )
-  )
-  ),
-  levels = elo_levels
-  )][, BlackEloRange := factor(
-  ifelse(
-  BlackElo < 1200,
-  "Below 1200",
-  ifelse(
-  BlackElo < 1400,
-  "1200 - 1399",
-  ifelse(
-  BlackElo < 1600,
-  "1400 - 1599",
-  ifelse(
-  BlackElo < 1800,
-  "1600 - 1799",
-  ifelse(
-  BlackElo < 2000,
-  "1800 - 1999",
-  ifelse(
-  BlackElo < 2200,
-  "2000 - 2199",
-  ifelse(
-  BlackElo < 2300,
-  "2200 - 2299",
-  ifelse(
-  BlackElo < 2400,
-  "2300 - 2399",
-  ifelse(
-  BlackElo < 2500,
-  "2400 - 2499",
-  ifelse(BlackElo < 2700,
-  "2500 - 2699",
-  "2700+")
-  )
-  )
-  )
-  )
-  )
-  )
-  )
-  )
-  ),
-  levels = elo_levels
-  )]
-rm(elo_levels)
+april_eval_base$WhiteEloRange <- cut(april_eval_base$WhiteElo,
+                                     breaks = elo_breaks,
+                                     labels = elo_labels, 
+                                     right = FALSE,
+                                     ordered_result = TRUE)
+april_eval_base$BlackEloRange <- cut(april_eval_base$BlackElo,
+                                     breaks = elo_breaks,
+                                     labels = elo_labels, 
+                                     right = FALSE,
+                                     ordered_result = TRUE)
+rm(elo_breaks)
+rm(elo_labels)
 ```
 
 ### RatingDiff {#ratingdiff}

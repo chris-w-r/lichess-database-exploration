@@ -1,0 +1,363 @@
+---
+title: "Player Distributions with Game Types and Finishes"
+output: html_notebook
+---
+
+***
+
+## Overview
+In this analysis we will explore who plays chess games, which types of games they play, and how those games end.  First, we will begin by exploring the intersection of those 3 ideas.  Then, we will explore each one independently more in depth.
+
+For consistency with future analyses this analysis only covers games with complete data in April 2017 which have computer evaluations.  In total, this covers `r format(nrow(april_eval_base), big.mark = ",")` games.
+
+***
+
+## Player Distributions with Game Types and Finishes
+We are not seeking to create an engine which judges how well a came is played ([Stockfish](https://stockfishchess.org/) has that covered extremely well), rather, we are trying to understand *which* games are played and *how* they are played by the different ratings of players who play them.
+
+### Player Pairing Differences in Tournament and Non-Tournament Games
+All players have an Elo rating which attempts to quantify their chess skill.  In any online game, typically it's preferred if similarly skilled players are matched against each other.  This heat map shows that games typically occur between players in similar Elo rating ranges.  However, in tournaments, players can be matched against anyone else who has signed up for that tournament creating more unbalanced games.
+
+```{r elo heatmap by tournament, echo=FALSE}
+april_eval_base %>%
+  filter(TimeControlVariation != "Correspondence") %>%
+  count(WhiteEloRange, BlackEloRange, Tournament) %>%
+  ggplot() + 
+  geom_raster(aes(x = WhiteEloRange, y = BlackEloRange, fill = log10(n))) +
+  geom_hline(aes(yintercept = 6.5), color = "White", size = 1.5) + 
+  geom_vline(aes(xintercept = 6.5), color = "White", size = 1.5) + 
+  geom_abline(aes(intercept = 1, slope = 1), color = "White", size = 1) +
+  geom_abline(aes(intercept = -1, slope = 1), color = "White", size = 1) +
+  facet_wrap(~Tournament) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  viridis::scale_fill_viridis() +
+  labs(title = "Most games occur between players of similar ratings",
+       subtitle = "Tournaments see more unbalanced games",
+       x = "White Elo Range",
+       y = "Black Elo Range",
+       fill = "Logarithm of\nCount of\nGames Played")
+```
+*Note: The verticle and horizontal white lines indicate starting ranges for titled players (e.g. Grandmasters)*
+
+### Game Endings in Different Game Types
+Lichess classifies games by their time control settings of how many minutes are initially on the clock for each player and how many seconds are added after each move.  UltraBullet games are the quickest with 15 initial seconds for each player for all their moves over the entire game and no increment.  Correspondence games are the longest with days allocated for each move.  This stacked bar graph shows that games of different lengths of time controls typically end in different ways.  In particular, many UltraBullet games simply end by one player's time running out before a checkmate has been achieved (Time forfeit).  However, the way games end for a particular time control variation does not change much for Tournament and Non-Tournament games.
+
+```{r stacked bar game endings by variation, echo=FALSE}
+april_eval_base %>%
+  mutate(Ending = factor(if_else(Winner == "Draw", "Draw", if_else(Termination == "Time forfeit", "Time forfeit", if_else(Checkmate, "Checkmate", "Resign"))), levels = c("Checkmate", "Resign", "Time forfeit", "Draw"))) %>%
+  ggplot() +
+  geom_bar(aes(TimeControlVariation, fill = Ending), color = "Black", position = "fill") +
+  facet_wrap(~Tournament, ncol = 1) +
+  labs(title = "UltraBullet games typically end by Time forfeit",
+       subtitle = "Tournament games have similar ending distributions to Non-Tournament ones",
+       x = "Time Control Variation",
+       fill = "Ending") +
+  scale_fill_brewer(palette = "Dark2") +
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.title.y = element_blank()) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Classical Draw Likelihood
+Classical is the longest game variation classification where the game is expected to be completed in one sitting.  These games have an initial clock setting for each player at 7 or more minutes (although, hours for each player is also commonly seen).  This setting allows players the most time to think about the board positions and anticipate how the game will play out.  This heatmap shows that draws are most likely to occur when two higher rated players play against each other.  This may be due to the fact that both players can more easily see that the game will get to the point where neither can win and agree to a draw or either player can force the game into a drawing position.
+
+```{r classical drawing heatmap, echo=FALSE}
+april_eval_base %>%
+  filter(TimeControlVariation == "Classical") %>%
+  mutate(Ending = factor(if_else(Winner == "Draw", "Draw", if_else(Termination == "Time forfeit", "Time forfeit", if_else(Checkmate, "Checkmate", "Resign"))), levels = c("Checkmate", "Resign", "Time forfeit", "Draw"))) %>%
+  group_by(WhiteEloRange, BlackEloRange) %>%
+  summarise(DrawPercentage = mean(Ending == "Draw") * 100, n = n()) %>%
+  filter(n >= 20) %>%
+  ggplot() +
+  geom_raster(aes(x = WhiteEloRange, y = BlackEloRange, fill = DrawPercentage)) +
+  geom_hline(aes(yintercept = 6.5), color = "White", size = 1.5) + 
+  geom_vline(aes(xintercept = 6.5), color = "White", size = 1.5) +
+  geom_abline(aes(intercept = 1, slope = 1), color = "White", size = 1) +
+  geom_abline(aes(intercept = -1, slope = 1), color = "White", size = 1) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  viridis::scale_fill_viridis(option="plasma") +
+  labs(title = "Draws are more likely in games between high rated players",
+       x = "White Elo Range",
+       y = "Black Elo Range",
+       fill = "Percentage of\nGames Ending\nin a Draw")
+```
+
+### Blitz Resign vs. Checkmate
+Blitz is the next fastest time control variation with an initial clock setting for each player between 3 and 7 minutes.  Removing games that end in a draw or end because one player runs out of time, this heatmap shows the difference in games ending by resignation (lighter squares) and checkmate (darker squares).  It shows that when two higher rated players play, one of them is more likely to resign than when two lower rated players play.  Like the last heatmap, this may be due to the fact that higher rated players can see when they are going to be checkmated and resign ahead of time.
+
+```{r blitz resign heatmap, echo=FALSE}
+april_eval_base %>%
+  filter(TimeControlVariation == "Blitz") %>%
+  mutate(Ending = factor(if_else(Winner == "Draw", "Draw", if_else(Termination == "Time forfeit", "Time forfeit", if_else(Checkmate, "Checkmate", "Resign"))), levels = c("Checkmate", "Resign", "Time forfeit", "Draw"))) %>%
+  filter(Ending != "Draw", Ending != "Time forfeit") %>%
+  group_by(WhiteEloRange, BlackEloRange) %>%
+  summarise(ResignPercentage = mean(Ending == "Resign") * 100, n = n()) %>%
+  filter(n >= 20) %>%
+  ggplot() +
+  geom_raster(aes(x = WhiteEloRange, y = BlackEloRange, fill = ResignPercentage)) +
+  geom_hline(aes(yintercept = 6.5), color = "White", size = 1.5) + 
+  geom_vline(aes(xintercept = 6.5), color = "White", size = 1.5) +
+  geom_abline(aes(intercept = 1, slope = 1), color = "White", size = 1) +
+  geom_abline(aes(intercept = -1, slope = 1), color = "White", size = 1) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  viridis::scale_fill_viridis(option="magma") +
+  labs(title = "Higher rated players are more likely to resign",
+       x = "White Elo Range",
+       y = "Black Elo Range",
+       fill = "Percentage of\nGames Ending\nby Resignation")
+```
+
+### Bullet Time Forfeit vs. Resign or Checkmate
+Bullet is the second fastest time control variation with an initial clock setting for each player greater than 15 seconds and less than 3 minutes.  Removing games that end in a draw, this heatmap shows the difference in games ending by time forfeit (lighter squares) and resign or checkmate (darker squares).  It shows that when two higher rated players play, they are more likely to complete the game (either by checkmating their opponent or resigning ahead of being checkmated) rather than simply running out of time.  Even in these short games, high rated players are consistently able to play an entire game!
+
+```{r bullet time forfeit heatmap, echo=FALSE}
+april_eval_base %>%
+  filter(TimeControlVariation == "Bullet") %>%
+  mutate(Ending = factor(if_else(Winner == "Draw", "Draw", if_else(Termination == "Time forfeit", "Time forfeit", if_else(Checkmate, "Checkmate", "Resign"))), levels = c("Checkmate", "Resign", "Time forfeit", "Draw"))) %>%
+  filter(Ending != "Draw") %>%
+  group_by(WhiteEloRange, BlackEloRange) %>%
+  summarise(TimeForfeitPercentage = mean(Ending == "Time forfeit") * 100, n = n()) %>%
+  filter(n >= 20) %>%
+  ggplot() +
+  geom_raster(aes(x = WhiteEloRange, y = BlackEloRange, fill = TimeForfeitPercentage)) +
+  geom_hline(aes(yintercept = 6.5), color = "White", size = 1.5) + 
+  geom_vline(aes(xintercept = 6.5), color = "White", size = 1.5) +
+  geom_abline(aes(intercept = 1, slope = 1), color = "White", size = 1) +
+  geom_abline(aes(intercept = -1, slope = 1), color = "White", size = 1) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  viridis::scale_fill_viridis(option="inferno") +
+  labs(title = "Lower rated players are more likely to run out of time",
+       x = "White Elo Range",
+       y = "Black Elo Range",
+       fill = "Percentage of\nGames Ending\nby Time Forfeit")
+```
+
+### All Player Pairing Variations
+Finally, for completeness, these heatmaps expand further on pairings across time control variations and whether or not it was a tournament game.
+
+```{r all pairing variations, echo=FALSE}
+april_eval_base %>%
+  filter(TimeControlVariation != "Correspondence") %>%
+  count(WhiteEloRange, BlackEloRange, TimeControlVariation, Tournament) %>%
+  ggplot() + 
+  geom_raster(aes(x = WhiteEloRange, y = BlackEloRange, fill = log10(n))) +
+  geom_hline(aes(yintercept = 6.5), color = "White", size = 1.5) + 
+  geom_vline(aes(xintercept = 6.5), color = "White", size = 1.5) + 
+  geom_abline(aes(intercept = 1, slope = 1), color = "White", size = 1) +
+  geom_abline(aes(intercept = -1, slope = 1), color = "White", size = 1) +
+  facet_grid(Tournament~TimeControlVariation) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  viridis::scale_fill_viridis() +
+  labs(title = "Most games occur between players of similar ratings",
+       subtitle = "Tournaments see more imbalanced games",
+       x = "White Elo Range",
+       y = "Black Elo Range",
+       fill = "Logarithm of\nCount of\nGames Played")
+```
+
+***
+
+## Player Distributions
+In this section, we will look at the Elo ratings regardless of which time control variation is being played or how the game ended.
+
+### Elo Density Plot
+This density plot shows that the rating distributions are similar for White and Black players as indicated by the abundance of purple showing where the White and Black rating plots overlap.  This shows that Lichess does a good job of not setting higher rated players to one particular color.
+
+```{r elo density, echo=FALSE}
+bind_rows(
+  select(april_eval_base, WhiteElo) %>% 
+    rename(Elo = WhiteElo) %>% 
+    mutate(Player = "White"),
+  select(april_eval_base, BlackElo) %>%
+    rename(Elo = BlackElo) %>% 
+    mutate(Player = "Black")
+  ) %>%
+  ggplot() +
+  geom_density(aes(Elo, fill = Player), alpha = .5) +
+  labs(title = "Elo rating distributions are similar for White and Black",
+       subtitle = "Ratings also appear normally distributed",
+       x = "Elo Rating") +
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.title.y = element_blank()) +
+  scale_fill_manual(values = c(White = "Red", Black = "Blue"),
+                    breaks = c("White", "Black"))
+```
+
+### Elo Range Heatmap
+This heatmap shows the pairings of all player ratings.  While players of all ratings can and have met in games, in general, Lichess matches similarly rated players.
+
+```{r elo range heatmap, echo=FALSE}
+april_eval_base %>%
+  count(WhiteEloRange, BlackEloRange) %>%
+  ggplot() + 
+  geom_raster(aes(x = WhiteEloRange, y = BlackEloRange, fill = log10(n))) +
+  geom_hline(aes(yintercept = 6.5), color = "White", size = 1.5) + 
+  geom_vline(aes(xintercept = 6.5), color = "White", size = 1.5) + 
+  geom_abline(aes(intercept = 1, slope = 1), color = "White", size = 1) +
+  geom_abline(aes(intercept = -1, slope = 1), color = "White", size = 1) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  viridis::scale_fill_viridis() +
+  labs(title = "Most games occur between players of similar ratings",
+       x = "White Elo Range",
+       y = "Black Elo Range",
+       fill = "Logarithm of\nCount of\nGames Played")
+```
+
+### Titled Players' Max Elo
+As players progress in their career, they can earn titles by their home countries as well as the world governing body for chess -- FIDE.  Titles are earned by attaining a minimum rating and performing well in certain tournaments.  Once earning a title, players can have this title show up with their username on Lichess.  If a player does not have a national or FIDE title, Lichess may provide a title upon reaching certain criteria.  The progression through the titles is:
+
+1. National Master
+2. Candidate Master
+3. FIDE Master
+4. International Master
+5. Grandmaster
+
+This boxplot shows the distributions of the max Elo rating by title for each titled player.  This shows that the median Elo rating increases by title.
+
+```{r titled boxplot, echo=FALSE}
+bind_rows(
+  filter(april_eval_base, !is.na(WhiteTitle)) %>%
+    select(White, WhiteElo, WhiteTitle) %>% 
+    rename(Player = White, Elo = WhiteElo, Title = WhiteTitle),
+  filter(april_eval_base, !is.na(BlackTitle)) %>% 
+    select(Black, BlackElo, BlackTitle) %>%
+    rename(Player = Black, Elo = BlackElo, Title = BlackTitle)
+  ) %>%
+  filter(!(Title %in% c("WNM", "WFM", "WIM", "WGM"))) %>%
+  group_by(Player, Title) %>%
+  summarise(Elo = max(Elo)) %>%
+  ggplot() +
+  geom_boxplot(aes(Title, Elo, color = Title)) +
+  geom_jitter(aes(Title, Elo, color = Title), alpha = .5) +
+  labs(title = "Elo ratings increase by title",
+       y = "Elo Rating") + 
+  theme(legend.position = "none") 
+```
+
+### Titled Players' Max Elo as a Density Plot
+We can also plot the titled players' max Elo ratings in a density plot.  This allows us to compare the peaks of the distributions rather than the medians from the boxplots.
+
+```{r titled density, echo=FALSE}
+bind_rows(
+  filter(april_eval_base, !is.na(WhiteTitle)) %>%
+    select(White, WhiteElo, WhiteTitle) %>%
+    rename(Player = White, Elo = WhiteElo, Title = WhiteTitle),
+  filter(april_eval_base, !is.na(BlackTitle)) %>%
+    select(Black, BlackElo, BlackTitle) %>%
+    rename(Player = Black, Elo = BlackElo, Title = BlackTitle)
+  ) %>%
+  filter(!(Title %in% c("WNM", "WFM", "WIM", "WGM"))) %>%
+  group_by(Player, Title) %>%
+  summarise(Elo = max(Elo)) %>%
+  ggplot() + 
+  geom_density(aes(Elo, fill = Title), alpha = .5) +
+  labs(title = "Elo rating density peaks increase by title",
+       x = "Elo Rating") +
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.title.y = element_blank())
+```
+
+***
+
+## Game Types
+In this section, we will look at the time control variations played regardless of player Elo ratings or how the game ended.
+
+### Games Played by Type
+Lichess classifies games as either UltraBullet, Bullet, Blitz, Classical, and Correspondence.  Lichess also offers the opportunity to organize online tounraments.
+
+```{r game types bar, echo=FALSE}
+april_eval_base %>%
+  ggplot() +
+  geom_bar(aes(TimeControlVariation, fill = Tournament), color = "Black") +
+  labs(title = "Most popular types are Blitz and Classical",
+       x = "Time Control Variation",
+       y = "Games Played") + 
+  scale_fill_manual(values = c("Non-Tournament" = "Gray", "Tournament" = "Orange")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Games Played by Time Controls
+While players are free to set any time controls they wish, typically shorter time controls are more popular as this scatterplot shows having the majority of large points at less than 25 minutes and 25 second increments.
+
+```{r time control scatterplot, echo=FALSE}
+april_eval_base %>%
+  filter(TimeControlVariation != "Correspondence") %>%
+  ggplot() +
+  geom_count(aes(x = TimeControlMinutes, y = TimeControlIncrement,  color = TimeControlVariation, shape = Tournament), alpha = .5) +
+  labs(title = "Most games have relatively quick time controls",
+       x = "Minutes",
+       y = "Increment (Seconds)",
+       size = "Games Played",
+       color = "Time Control Variation") +
+  scale_color_brewer(palette = "Set1")
+```
+
+### UltraBullet, Bullet, and Blitz Games Played by Time Controls
+UltraBullet, Bullet, and Blitz have the shortest time controls.  Anything longer than Blitz is classified as Classical.  Correspondence is a special case where players are given multiple days per move.  This scatterplot shows that multiple settings are played, only a few are popular.  Tournaments tend to be set at these few popular time control settings.
+
+```{r ultrabullet bullet blitz by time controls, echo=FALSE}
+april_eval_base %>%
+  filter(TimeControlVariation != "Correspondence", TimeControlVariation != "Classical") %>%
+  ggplot() +
+  geom_count(aes(x = TimeControlMinutes, y = TimeControlIncrement, color = TimeControlVariation, shape = Tournament), alpha = .5) +
+  labs(title = "A small number of time control options are popular",
+       x = "Minutes",
+       y = "Increment (Seconds)",
+       size = "Games Played",
+       color = "Time Control Variation") +
+  scale_color_brewer(palette = "Set1")
+```
+
+### Classical Games with Less than 25 Minutes and Less Than 25 Second Increment Played by Time Controls
+While Classical games have any time control settings longer than Blitz's, the most popular settings are still relatively quick at less than 25 minutes and less than 25 second increments.  Even when viewing this subset, this scatterplot shows that one time control is the most popular -- 10 minutes and 0 second increments (typically written 10+0).
+
+```{r classical by time controls, echo=FALSE}
+april_eval_base %>%
+  filter(TimeControlVariation == "Classical", TimeControlMinutes <= 25, TimeControlIncrement <= 25) %>%
+  ggplot() +
+  geom_count(aes(x = TimeControlMinutes, y = TimeControlIncrement, color = TimeControlVariation, shape = Tournament), alpha = .5) +
+  labs(title = "10+0 is the dominant Classical time control",
+       x = "Minutes",
+       y = "Increment (Seconds)",
+       size = "Games Played",
+       color = "Time Control Variation") +
+  scale_color_manual(values = RColorBrewer::brewer.pal(9, "Set1")[4])
+```
+
+***
+
+## Game Endings
+In this section, we will look at how games end regardless of the time control variations played or player Elo ratings.
+
+### PGN Coded
+[Portable Game Notation](https://en.wikipedia.org/wiki/Portable_Game_Notation) specifies how to encode information about chess games.  In particular, it specifes how to record Termination and Result.  This stacked bar graph shows these combinations for the data.
+
+```{r pgn endings, echo=FALSE}
+april_eval_base %>%
+  ggplot() +
+  geom_bar(aes(Termination, fill = Winner), color = "Black") +
+  scale_fill_brewer(palette = "Set3") +
+  labs(title = "PGN Coded Endings",
+       y = "Games Played")
+```
+
+### Normal Endings Recoded
+When games have "Normal" endings where either White or Black wins, it may be interesting to view the data by whether there was a checkmate or one of the players resigned.  For this analysis, we have recoded the endings as shown by this bar graph.
+
+```{r endings recoded, echo=FALSE}
+april_eval_base %>%
+  filter(Termination == "Normal" || Termination == "Time forfeit") %>%
+  mutate(Ending = factor(if_else(Winner == "Draw", "Draw", if_else(Termination == "Time forfeit", "Time forfeit", if_else(Checkmate, "Checkmate", "Resign"))), levels = c("Checkmate", "Resign", "Time forfeit", "Draw"))) %>%
+  ggplot() +
+  geom_bar(aes(Ending, fill = Ending), color = "Black") +
+  scale_fill_brewer(palette = "Dark2") +
+  labs(title = "Recoding the Endings",
+       y = "Games Played")
+```
+
+## Thanks
+Thank you again to **Lichess** for making this data available for free!  And thank you to **you** for reading this analysis!
+

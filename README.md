@@ -8,6 +8,8 @@ Lichess generously made available for free a [database](https://database.lichess
 
 ## Analyses
 
+* [Player Distributions with Game Types and Finishes](https://cdn.rawgit.com/chris-w-r/lichess-database-exploration/master/Player%20Distributions%20with%20Game%20Types%20and%20Finishes.nb.html)
+
 ## Supporting Files
 
 * [Project and Data Setup](https://cdn.rawgit.com/chris-w-r/lichess-database-exploration/master/Project%20and%20Data%20Setup.nb.html)

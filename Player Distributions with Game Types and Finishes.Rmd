@@ -358,6 +358,8 @@ april_eval_base %>%
        y = "Games Played")
 ```
 
+***
+
 ## Thanks
 Thank you again to **Lichess** for making this data available for free!  And thank you to **you** for reading this analysis!
 

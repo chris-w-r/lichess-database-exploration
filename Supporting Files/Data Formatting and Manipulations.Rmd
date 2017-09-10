@@ -35,8 +35,8 @@ knitr::opts_chunk$set(eval = FALSE)
 library(data.table)
 library(tidyverse)
 
-drop_columns_after_manipulation <- FALSE
-check_factors_lost_data <- TRUE
+drop_columns_after_manipulation <- TRUE
+check_factors_lost_data <- FALSE
 
 
 load(file = paste0(lichess_db_standard_rated_filepath,
@@ -217,8 +217,88 @@ if(check_factors_lost_data)
 ```
 
 ### ECO {#ECO}
+<https://en.wikipedia.org/wiki/Encyclopaedia_of_Chess_Openings>
 ```{r ECO}
-#TBD
+april_eval_base[, ECOCategory := factor(sub("([A-E])\\d\\d", "\\1", ECO),
+                                        levels = c("A", "B", "C", "D", "E"))][, ECOSubcategory := as.numeric(sub("[A-E](\\d\\d)", "\\1", ECO))][, ECOVolume := factor(
+                                        ifelse(
+                                        ECOCategory == "A",
+                                        "A: Flank openings",
+                                        ifelse(
+                                        ECOCategory == "B",
+                                        "B: Semi-Open Games other than the French Defense",
+                                        ifelse(
+                                        ECOCategory == "C",
+                                        "C: Open Games and the French Defense",
+                                        ifelse(
+                                        ECOCategory == "D",
+                                        "D: Closed Games and Semi-Closed Games",
+                                        "E: Indian Defenses"
+                                        )
+                                        )
+                                        )
+                                        ),
+                                        levels = c(
+                                        "A: Flank openings",
+                                        "B: Semi-Open Games other than the French Defense",
+                                        "C: Open Games and the French Defense",
+                                        "D: Closed Games and Semi-Closed Games",
+                                        "E: Indian Defenses"
+                                        )
+                                        )][, ECOGrouping := factor(ifelse(
+                                        ECOCategory == "A",
+                                        ifelse(ECOSubcategory >= 0 & ECOSubcategory <= 39, "White first moves other than 1.e4, 1.d4 (A00–A39)", ifelse(ECOSubcategory >= 40 & ECOSubcategory <= 44, "1.d4 without 1...d5, 1...Nf6: Atypical replies to 1.d4 (A40–A44)", ifelse(ECOSubcategory >= 45 & ECOSubcategory <= 49, "1.d4 Nf6 without 2.c4: Atypical replies to 1...Nf6 (A45–A49)", ifelse(ECOSubcategory >= 50 & ECOSubcategory <= 79, "1.d4 Nf6 2.c4 without 2...e6, 2...g6: Atypical Indian systems (A50–A79)", "1.d4 f5: Dutch Defence (A80–A99)")))), 
+                                          
+                                        ifelse(
+                                        ECOCategory == "B",
+                                        ifelse(ECOSubcategory >= 0 & ECOSubcategory <= 9, "1.e4 without 1...c6, 1...c5, 1...e6, 1...e5 (B00–B09)", ifelse(ECOSubcategory >= 10 & ECOSubcategory <= 19, "1.e4 c6: Caro–Kann Defence (B10–B19)", "1.e4 c5: Sicilian Defence (B20–B99)")),
+                                        
+                                        ifelse(
+                                        ECOCategory == "C",
+                                        ifelse(ECOSubcategory >= 0 & ECOSubcategory <= 19, "1.e4 e6: French Defence (C00–C19)", "1.e4 e5: Double King Pawn games (C20–C99)"),
+                                               
+                                        ifelse(
+                                        ECOCategory == "D",
+                                        ifelse(ECOSubcategory >= 0 & ECOSubcategory <= 69, "1.d4 d5: Double Queen Pawn games (D00–D69)", "1.d4 Nf6 2.c4 g6 with 3...d5: Grünfeld Defence (D70–D99)"),
+                                        
+                                        ifelse(ECOSubcategory >= 0 & ECOSubcategory <= 59, "1.d4 Nf6 2.c4 e6: Indian systems with ...e6 (E00–E59)", "1.d4 Nf6 2.c4 g6 without 3...d5: Indian systems with ...g6 (except Grünfeld) (E60–E99)")
+                                        
+                                        )
+                                        )
+                                        )
+                                        ), levels = c(
+                                          
+"White first moves other than 1.e4, 1.d4 (A00–A39)",
+"1.d4 without 1...d5, 1...Nf6: Atypical replies to 1.d4 (A40–A44)",
+"1.d4 Nf6 without 2.c4: Atypical replies to 1...Nf6 (A45–A49)",
+"1.d4 Nf6 2.c4 without 2...e6, 2...g6: Atypical Indian systems (A50–A79)",
+"1.d4 f5: Dutch Defence (A80–A99)",
+
+
+
+"1.e4 without 1...c6, 1...c5, 1...e6, 1...e5 (B00–B09)",
+"1.e4 c6: Caro–Kann Defence (B10–B19)",
+"1.e4 c5: Sicilian Defence (B20–B99)",
+                                          
+                                          
+"1.e4 e6: French Defence (C00–C19)",
+"1.e4 e5: Double King Pawn games (C20–C99)",
+
+
+"1.d4 d5: Double Queen Pawn games (D00–D69)",
+"1.d4 Nf6 2.c4 g6 with 3...d5: Grünfeld Defence (D70–D99)",
+
+
+"1.d4 Nf6 2.c4 e6: Indian systems with ...e6 (E00–E59)",
+"1.d4 Nf6 2.c4 g6 without 3...d5: Indian systems with ...g6 (except Grünfeld) (E60–E99)"                                          
+
+
+
+                                          
+                                          
+                                          
+                                          
+                                        ))]
 ```
 
 ### Time Control {#timecontrol}

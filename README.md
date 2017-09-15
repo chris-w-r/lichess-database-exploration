@@ -12,6 +12,10 @@ Lichess generously made available for free a [database](https://database.lichess
 * First Move Preference by Rating Grouping *(Analyses Posted to r/chess on Reddit)*
   + [Lichess Database First Move Preference by Elo Range](https://redd.it/6yjzl6)
   + [Lichess Database First Move Preference by Elo Range by Time Controls and Tournament (follow-up analysis)](https://redd.it/6ykuyu)
+* Opening Winning Percentages
+  + [Lichess Database: Which openings are most successful](https://redd.it/7045in) *(Posted to r/chess on Reddit)*
+  + [Lichess Database: Which openings are most successful - interactive dashboard](https://public.tableau.com/profile/chris.w.r#!/vizhome/OpeningWinningPercentages/OpeningWinningPercentagesDashboard) *(Tableau dashboard)*
+    - [csv of the data used to make the dashboard](https://github.com/chris-w-r/lichess-database-exploration/blob/master/Analyses/Opening%20Winning%20Percentages/Opening%20Wins.csv)
 
 ## Supporting Files
 

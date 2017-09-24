@@ -8,14 +8,12 @@ Lichess generously made available for free a [database](https://database.lichess
 
 ## Analyses
 
-* [Player Distributions with Game Types and Finishes](https://cdn.rawgit.com/chris-w-r/lichess-database-exploration/664ae51cc68ed1829f2fcc39855eeb9b8ddb0c2c/Player%20Distributions%20with%20Game%20Types%20and%20Finishes.nb.html)
-* First Move Preference by Rating Grouping *(Analyses Posted to r/chess on Reddit)*
-  + [Lichess Database First Move Preference by Elo Range](https://redd.it/6yjzl6)
+* [Player Distributions with Game Types and Finishes](https://cdn.rawgit.com/chris-w-r/lichess-database-exploration/664ae51cc68ed1829f2fcc39855eeb9b8ddb0c2c/Player%20Distributions%20with%20Game%20Types%20and%20Finishes.nb.html) *(**HTML** report)*
+
+* [Lichess Database: Which openings are most successful - interactive dashboard](https://public.tableau.com/profile/chris.w.r#!/vizhome/OpeningWinningPercentages/OpeningWinningPercentagesDashboard) *(**Tableau** dashboard)*
+
+* [Lichess Database: First Move Preference by Elo Range](https://redd.it/6yjzl6) *(**Image** posted to r/chess on Reddit)*
   + [Lichess Database First Move Preference by Elo Range by Time Controls and Tournament (follow-up analysis)](https://redd.it/6ykuyu)
-* Opening Winning Percentages
-  + [Lichess Database: Which openings are most successful](https://redd.it/7045in) *(Posted to r/chess on Reddit)*
-  + [Lichess Database: Which openings are most successful - interactive dashboard](https://public.tableau.com/profile/chris.w.r#!/vizhome/OpeningWinningPercentages/OpeningWinningPercentagesDashboard) *(Tableau dashboard)*
-    - [csv of the data used to make the dashboard](https://github.com/chris-w-r/lichess-database-exploration/blob/master/Analyses/Opening%20Winning%20Percentages/Opening%20Wins.csv)
 
 ## Supporting Files
 
